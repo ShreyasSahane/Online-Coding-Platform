@@ -1,0 +1,211 @@
+/* General Dashboard Container */
+.dashboard {
+    width: 100%;
+    height: 40vh;
+    margin-top: 5px;
+    display: flex;
+    background-color: #f8f9fa; /* Light gray background */
+    border-radius: 12px; /* Rounded corners */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Light shadow for the dashboard */
+}
+
+/* Line Container */
+.line {
+    width: 90%;
+    height: 100%; /* Take full height of the parent container */
+    background-color: #fff; /* White background for the line sections */
+    border-radius: 12px; /* Rounded corners for the line container */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Light shadow */
+    margin: 5px;
+    border: 2px solid orange;
+}
+
+/* Profile Section Styling */
+.profile {
+    width: 70%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+    background-color: #f1f3f5; /* Soft light background */
+    border-radius: 12px; /* Rounded corners */
+    box-shadow: 0 4px 8px rgba(6, 0, 0, 0.1); /* Light shadow for profile section */
+}
+
+/* Stats Section Styling */
+.stats {
+    display: flex;
+    justify-content: space-around; /* Evenly distribute items */
+    padding: 20px;
+    flex-wrap: wrap; /* Ensure child items can wrap on smaller screens */
+    background-color: #f1f3f5; /* Soft light background */
+    border-radius: 12px; /* Rounded corners */
+    box-shadow: 0 4px 8px rgba(6, 0, 0, 0.1);
+}
+
+.total {
+    width: 200px;
+    height: 200px;
+    text-align: center;
+    justify-content: center;
+    margin-top: 60px;
+    background-color: rgba(224, 244, 208, 0.8); /* Light background */
+    border-radius: 50%; /* Make it circular */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    border: 10px solid transparent; /* Placeholder for custom multi-color border */
+    margin-bottom: 20px;  /* Add margin to the bottom for spacing */
+    border-top: 4px solid orange;    /* Top border is red */
+    border-right: 4px solid red;  /* Right border is green */
+    border-left: 4px solid green;
+}
+
+.count {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #007bff;
+    text-align: center;
+    z-index: 1; /* Ensure the text stays on top of the border */
+}
+
+/* Difficulty Level Section Styling */
+.difficultyLevel {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center; /* Center align the difficulty level buttons */
+    margin-top: 0px;
+    
+}
+
+.level {
+    margin-top: 5px;
+    width: 100px;
+    font-size: 1.2rem;
+    text-align: center;
+    border-radius: 8px;
+    background-color: lightgray;
+    padding: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+/* Hover effects for difficulty level buttons */
+.level:hover {
+    background-color: #007bff; /* Change background color to blue */
+    color: #fff; /* Change text color to white */
+    transform: scale(1.05); /* Slightly enlarge the button */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Add shadow on hover */
+}
+
+.category
+{
+    background-color: #f1f3f5; /* Soft light background */
+    border-radius: 12px; /* Rounded corners */
+    box-shadow: 0 4px 8px rgba(6, 0, 0, 0.1);
+}
+
+/* Media Queries for Responsiveness */
+
+/* For tablets and smaller screens */
+@media (max-width: 768px) {
+    .dashboard {
+        flex-direction: column;  /* Stack sections vertically */
+        height: auto;
+    }
+
+    .line {
+        width: 100%; /* Ensure each section takes full width */
+        margin-bottom: 20px; /* Add margin between stacked sections */
+    }
+
+    .stats {
+        /* flex-direction: column;  */
+        flex-direction: row;
+        justify-content: space-around;
+        /* align-items: center; */
+    }
+
+    .total {
+        width: 150px;
+        height: 150px;
+        margin-top: 20px;
+    }
+
+    .difficultyLevel {
+        width: 100%;  /* Ensure difficulty level section takes full width */
+        flex-direction: row;
+    }
+
+    .level {
+        width: 80px;  /* Adjust size of difficulty buttons */
+        font-size: 1rem;
+        margin: 15px;
+    }
+}
+
+@media (max-width: 958px) and (min-width: 770px) 
+{
+    .stats {
+        flex-direction: column; 
+        align-items: center; /* Center align the stats */
+        justify-content: center;
+    }
+
+    .total {
+        width: 120px;
+        height: 120px;
+        margin-top: 15px;
+    }
+
+    .count {
+        font-size: 1.5rem;  /* Reduce font size on smaller screens */
+    }
+
+    .level {
+        width: 70px;
+        font-size: 1rem;
+        flex-direction: row;
+    }
+}
+
+/* For mobile devices (phones) */
+@media (max-width: 576px) {
+    .dashboard {
+        flex-direction: column; /* Stack sections vertically on small screens */
+        height: auto;
+    }
+
+    .profile {
+        padding: 15px;  /* Reduce padding */
+    }
+
+    .stats {
+        flex-direction: column; /* Stack the stats vertically */
+        align-items: center; /* Center align the stats */
+        justify-content: center;
+    }
+
+    .total {
+        width: 120px;
+        height: 120px;
+        margin-top: 15px;
+    }
+
+    .count {
+        font-size: 1.5rem;  /* Reduce font size on smaller screens */
+    }
+
+    .level {
+        width: 70px;
+        font-size: 1rem;
+    }
+
+    .category button {
+        width: 100%;  /* Ensure buttons are full width */
+        margin-bottom: 5px; /* Reduce margin */
+    }
+}

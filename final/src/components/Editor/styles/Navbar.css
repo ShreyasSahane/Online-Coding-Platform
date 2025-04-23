@@ -1,0 +1,18 @@
+.navbar {
+  display: flex;
+  background-color:gray;
+  border-bottom: 1px solid #ddd;
+}
+
+.navbar button {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  cursor: pointer;
+  background-color: gray;
+}
+
+.navbar button.active {
+  background-color: black;
+  color: white;
+}

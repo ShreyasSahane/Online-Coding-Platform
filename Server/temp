@@ -1,0 +1,532 @@
+package main
+
+import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"os/exec"
+	"strings"
+	"time"
+
+	"github.com/dgrijalva/jwt-go"
+	_ "github.com/lib/pq"
+	"golang.org/x/crypto/bcrypt"
+)
+
+var jwtKey = []byte("my_secret_key")
+
+type User struct {
+	UserID       int    `json:"user_id"`
+	Username     string `json:"username"`
+	UserEmail    string `json:"user_email"`
+	UserPassword string `json:"user_password"`
+}
+
+type Credentials struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	Username string `json:"username"`
+}
+
+type Claims struct {
+	UserID int    `json:"user_id"`
+	Email  string `json:"email"`
+	jwt.StandardClaims
+}
+
+var db *sql.DB
+
+func init() {
+	var err error
+	connStr := "user=shreyas password=shreyas2 dbname=coding_platform sslmode=disable"
+	db, err = sql.Open("postgres", connStr)
+	if err != nil {
+		log.Fatalf("Unable to connect to database: %v\n", err)
+	}
+	err = db.Ping()
+	if err != nil {
+		log.Fatalf("Unable to reach database: %v\n", err)
+	}
+	fmt.Println("Connected to database successfully!")
+}
+
+func LoginHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("LoginHandler invoked")
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var creds Credentials
+	err := json.NewDecoder(r.Body).Decode(&creds)
+	if err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	var user User
+	err = db.QueryRow("SELECT user_id, user_email, user_password FROM users WHERE user_email=$1", creds.Email).
+		Scan(&user.UserID, &user.UserEmail, &user.UserPassword)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "User not found", http.StatusUnauthorized)
+		} else {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Compare hashed password with the provided password
+	if err := bcrypt.CompareHashAndPassword([]byte(user.UserPassword), []byte(creds.Password)); err != nil {
+		http.Error(w, "Invalid password", http.StatusUnauthorized)
+		return
+	}
+
+	expirationTime := time.Now().Add(1 * time.Hour)
+	claims := &Claims{
+		UserID: user.UserID,
+		Email:  user.UserEmail,
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: expirationTime.Unix(),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(jwtKey)
+	if err != nil {
+		http.Error(w, "Could not generate token", http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"token":  tokenString,
+		"userID": user.UserID,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func SignupHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("SignupHandler invoked")
+
+	if r.Method != http.MethodPost {
+		log.Println("Invalid request method")
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var newUser User
+	if err := json.NewDecoder(r.Body).Decode(&newUser); err != nil {
+		log.Printf("Error decoding request body: %v\n", err)
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Received new user: %+v\n", newUser)
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newUser.UserPassword), bcrypt.DefaultCost)
+	if err != nil {
+		log.Printf("Error hashing password: %v\n", err)
+		http.Error(w, "Error creating account", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Hashed password: %s\n", hashedPassword)
+
+	_, err = db.Exec("INSERT INTO users (username, user_email, user_password) VALUES ($1, $2, $3)",
+		newUser.Username, newUser.UserEmail, hashedPassword)
+	if err != nil {
+		log.Printf("Database error: %v\n", err)
+		http.Error(w, "Error creating account", http.StatusInternalServerError)
+		return
+	}
+
+	log.Println("New user inserted successfully")
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "User created successfully"})
+}
+
+func ForgotPasswordHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("ForgotPasswordHandler invoked")
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var request struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Received forgot password request for email: %s\n", request.Email)
+
+	var exists bool
+	err := db.QueryRow("SELECT EXISTS (SELECT 1 FROM users WHERE user_email=$1)", request.Email).Scan(&exists)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if !exists {
+		http.Error(w, "Email does not exist", http.StatusNotFound)
+		return
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(request.Password), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, "Error updating password", http.StatusInternalServerError)
+		return
+	}
+
+	_, err = db.Exec("UPDATE users SET user_password=$1 WHERE user_email=$2", hashedPassword, request.Email)
+	if err != nil {
+		http.Error(w, "Error updating password", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Password updated successfully"})
+}
+
+func ProblemsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	log.Println("Attempting to fetch problems from the database...")
+	rows, err := db.Query("SELECT que_id, que_title, que_tags, que_level FROM questions")
+	if err != nil {
+		log.Printf("Database query error: %v\n", err)
+		http.Error(w, "Failed to fetch problems", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var problems []map[string]interface{}
+	for rows.Next() {
+		var que_id int
+		var que_title, que_tags, que_level string
+		if err := rows.Scan(&que_id, &que_title, &que_tags, &que_level); err != nil {
+			log.Printf("Row scan error: %v\n", err)
+			http.Error(w, "Error scanning row", http.StatusInternalServerError)
+			return
+		}
+		problems = append(problems, map[string]interface{}{
+			"id":    que_id,
+			"title": que_title,
+			"tags":  que_tags,
+			"level": que_level,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(problems)
+}
+
+// FetchPredefinedCodeHandler fetches the predefined code for a specific problem and language
+
+func ProblemDetailsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract que_id from the URL path (example: /problem-details/1)
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 3 {
+		http.Error(w, "Problem ID not provided", http.StatusBadRequest)
+		return
+	}
+	queID := parts[2] // Extract que_id from URL path
+
+	// Parse the Authorization header to ensure the token is valid
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		http.Error(w, "Authorization header missing", http.StatusUnauthorized)
+		return
+	}
+
+	// Remove "Bearer " prefix from the token
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	if tokenString == authHeader {
+		http.Error(w, "Malformed token", http.StatusUnauthorized)
+		return
+	}
+
+	// Parse and validate the token
+	claims := &Claims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		return jwtKey, nil
+	})
+
+	if err != nil || !token.Valid {
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
+		return
+	}
+
+	// Proceed to fetch problem details using queID (which is now extracted from the URL path)
+	var problem struct {
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		Tags        string `json:"tags"`
+		Level       string `json:"level"`
+		TestCases   []struct {
+			Input  string `json:"input"`
+			Output string `json:"output"`
+		} `json:"test_cases"`
+	}
+
+	// Query the database for the problem details
+	err = db.QueryRow("SELECT que_title, que_desc, que_tags, que_level FROM questions WHERE que_id = $1", queID).
+		Scan(&problem.Title, &problem.Description, &problem.Tags, &problem.Level)
+	if err != nil {
+		log.Printf("Error fetching problem details for que_id %s: %v\n", queID, err)
+		http.Error(w, "Problem not found", http.StatusNotFound)
+		return
+	}
+
+	// Fetch the test cases for the problem
+	rows, err := db.Query("SELECT tc_input, tc_output FROM test_cases WHERE que_id = $1", queID)
+	if err != nil {
+		log.Printf("Error fetching test cases for que_id %s: %v\n", queID, err)
+		http.Error(w, "Test cases not found", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var testCase struct {
+			Input  string `json:"input"`
+			Output string `json:"output"`
+		}
+		if err := rows.Scan(&testCase.Input, &testCase.Output); err != nil {
+			log.Printf("Error scanning test case: %v\n", err)
+			http.Error(w, "Error reading test cases", http.StatusInternalServerError)
+			return
+		}
+		problem.TestCases = append(problem.TestCases, testCase)
+	}
+
+	// Respond with problem details
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(problem)
+}
+
+func enableCors(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*") // Replace "*" with specific domains in production
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// PredefinedCodeHandler fetches the predefined code for a given question and language.
+func PredefinedCodeHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract que_id and language from query parameters
+	queID := r.URL.Query().Get("que_id")
+	language := r.URL.Query().Get("language")
+
+	if queID == "" || language == "" {
+		http.Error(w, "Missing que_id or language", http.StatusBadRequest)
+		return
+	}
+
+	// Build the column name dynamically based on the language
+	column := ""
+	switch language {
+	case "javascript":
+		column = "que_predefined_code_js"
+	case "python":
+		column = "que_predefined_code_python"
+	case "java":
+		column = "que_predefined_code_java"
+	case "c":
+		column = "que_predefined_code_c"
+	default:
+		http.Error(w, "Unsupported language", http.StatusBadRequest)
+		return
+	}
+
+	// Fetch predefined code from the database
+	var predefinedCode string
+	query := fmt.Sprintf("SELECT %s FROM questions WHERE que_id = $1", column)
+	err := db.QueryRow(query, queID).Scan(&predefinedCode)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "Question not found", http.StatusNotFound)
+		} else {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Respond with the predefined code
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"predefinedCode": predefinedCode})
+}
+
+type CompileRequest struct {
+	QueID    string `json:"que_id"`
+	Code     string `json:"code"`
+	Language string `json:"language"`
+}
+
+// TestResult represents the result of a test case
+type TestResult struct {
+	Input          string `json:"input"`
+	ExpectedOutput string `json:"expectedOutput"`
+	ActualOutput   string `json:"actualOutput"`
+	Result         string `json:"result"`
+}
+
+// CompileResponse represents the response after compilation
+type CompileResponse struct {
+	TestCases         []TestResult `json:"testCases"`
+	CompilationResult string       `json:"compilationResult"`
+}
+
+// CompileHandler handles the compilation request from the frontend
+func CompileHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var compileRequest CompileRequest
+	err := json.NewDecoder(r.Body).Decode(&compileRequest)
+	if err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	// Fetch test cases for the question from the database using Query
+	var testCases []struct {
+		Input  string
+		Output string
+	}
+	query := "SELECT tc_input, tc_output FROM test_cases WHERE que_id = $1"
+	rows, err := db.Query(query, compileRequest.QueID)
+	if err != nil {
+		http.Error(w, "Failed to fetch test cases: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	// Scan each row into the testCases slice
+	for rows.Next() {
+		var testCase struct {
+			Input  string
+			Output string
+		}
+		if err := rows.Scan(&testCase.Input, &testCase.Output); err != nil {
+			http.Error(w, "Failed to scan test case: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		testCases = append(testCases, testCase)
+	}
+
+	if err := rows.Err(); err != nil {
+		http.Error(w, "Error with database rows: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Execute the code in the selected language
+	var command *exec.Cmd
+	var result string
+
+	switch compileRequest.Language {
+	case "python":
+		command = exec.Command("python3", "-c", compileRequest.Code)
+	case "javascript":
+		command = exec.Command("node", "-e", compileRequest.Code)
+	case "java":
+		// Logic to handle Java code compilation and execution
+		command = exec.Command("javac", "-cp", "path/to/your/classpath", "Test.java")
+	case "c":
+		// Logic for C using gcc
+		command = exec.Command("gcc", "-o", "test.out", "test.c")
+	default:
+		http.Error(w, "Unsupported language", http.StatusBadRequest)
+		return
+	}
+
+	// Run the command and capture the output
+	output, err := command.CombinedOutput()
+	if err != nil {
+		result = "Compilation Error: " + err.Error() + "\n" + string(output)
+	} else {
+		result = "Compilation Success"
+	}
+
+	// Compare the code output against the test cases
+	var testResults []TestResult
+	for _, testCase := range testCases {
+		// Execute the compiled code with the input and capture the output
+		command = exec.Command("path/to/executable", testCase.Input)
+		actualOutput, err := command.Output()
+		fmt.Println(err)
+		// Compare expected and actual output
+		testResult := TestResult{
+			Input:          testCase.Input,
+			ExpectedOutput: testCase.Output,
+			ActualOutput:   string(actualOutput),
+		}
+
+		if strings.TrimSpace(testCase.Output) == strings.TrimSpace(string(actualOutput)) {
+			testResult.Result = "pass"
+		} else {
+			testResult.Result = "fail"
+		}
+
+		testResults = append(testResults, testResult)
+	}
+
+	// Respond with test case results and compilation status
+	compileResponse := CompileResponse{
+		TestCases:         testResults,
+		CompilationResult: result,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(compileResponse)
+}
+func main() {
+	defer db.Close()
+	http.Handle("/compile", enableCors(http.HandlerFunc(CompileHandler)))
+	http.Handle("/login", enableCors(http.HandlerFunc(LoginHandler)))
+	http.Handle("/signup", enableCors(http.HandlerFunc(SignupHandler)))
+	http.Handle("/forgot-password", enableCors(http.HandlerFunc(ForgotPasswordHandler)))
+	http.Handle("/problems", enableCors(http.HandlerFunc(ProblemsHandler)))
+	http.Handle("/problem-details/", enableCors(http.HandlerFunc(ProblemDetailsHandler)))
+	http.Handle("/predefined-code", enableCors(http.HandlerFunc(PredefinedCodeHandler)))
+
+	server := &http.Server{
+		Addr:    ":8080",
+		Handler: nil,
+	}
+
+	// Handle SIGINT/SIGTERM for graceful shutdown
+	log.Println("Server is running on port 8080...")
+	log.Fatal(server.ListenAndServe())
+}

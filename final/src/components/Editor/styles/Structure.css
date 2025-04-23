@@ -1,0 +1,72 @@
+/* App.css */
+
+/* Ensure the main app container takes the full height */
+.structure {
+  display: flex;
+  height: 100%; /* Full height of the window */
+  width: 100%;
+}
+
+/* Sidebar styling */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 30%; /* Sidebar takes up 30% of the width */
+  min-width: 250px; /* Prevent sidebar from becoming too narrow */
+  background-color: #f4f4f4;
+  border-right: 1px solid #ddd;
+  resize: horizontal; /* Allow resizing */
+  overflow: auto; /* Enable scrolling for overflowing content */
+}
+
+/* Main content area */
+.main-content {
+  flex: 1; /* Occupies the remaining width */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Prevent unintended scrolling */
+}
+
+/* Code editor section */
+.editor {
+  flex: 1; /* Take 60% of the height */
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10px;
+}
+
+/* Test cases and compilation results */
+.test-cases {
+  margin-bottom: 10px;
+}
+
+.compilation-result {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  background-color: #f9f9f9;
+  height: 100px; /* Fixed height for compilation result */
+  overflow: auto; /* Allow scrolling for long content */
+}
+
+/* Buttons and other controls */
+.buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+button {
+  padding: 10px;
+  font-size: 14px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #45a049;
+}

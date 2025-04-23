@@ -1,0 +1,20 @@
+.editor-container {
+  flex: 1; /* Takes up the remaining space in the column */
+  margin-bottom: 20px;
+  padding: 0; /* Remove padding to match container */
+  overflow: hidden; /* Ensures no content overflows the editor */
+}
+
+
+.code-editor {
+  width: 100%;
+  height: 100%;
+  overflow: auto; /* Add scrollbars for overflow content */
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-family: monospace;
+  font-size: 14px;
+  background-color: #ffffff; /* Dracula theme background */
+  color: #f8f8f2; /* Dracula theme text */
+  box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.1); /* Slight shadow for better visuals */
+}

@@ -1,0 +1,93 @@
+.test-cases {
+  margin-top: 20px;
+}
+
+.test-case-buttons {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  justify-content: center;
+}
+
+.test-case-button {
+  padding: 10px 100px;
+  font-size: 14px;
+  cursor: pointer;
+  color: white;
+  background-color: gray;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  transition: background-color 0.2s;
+}
+
+.test-case-button.active {
+  background-color: black;
+  color: white;
+}
+
+.test-case-button:hover {
+  background-color: rgb(92, 92, 92);
+}
+
+.test-case-details {
+  margin-top: 10px;
+  border: 1px solid #ddd;
+  padding: 10px;
+  border-radius: 5px;
+  background-color: #f9f9f9;
+}
+
+textarea,
+input[type="text"],
+input[type="number"] {
+  width: 100%;
+  padding: 10px;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  resize: none;
+}
+
+.num-parameters-input {
+  margin-bottom: 10px;
+}
+
+.user-input-field {
+  margin-bottom: 10px;
+}
+
+.buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.buttons button {
+  padding: 10px;
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.buttons button:hover {
+  background-color: #45a049;
+}
+
+.user-input-summary {
+  margin-top: 20px;
+}
+
+.result {
+  font-weight: bold;
+}
+
+.result.pass {
+  color: green;
+}
+
+.result.fail {
+  color: red;
+}
